@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Auto Google Form Bot - Nama Unik</title>
+<title>Auto Google Form Bot - Hybrid</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
-<div class="max-w-xl w-full bg-white shadow-2xl rounded-2xl p-6">
+<div class="max-w-2xl w-full bg-white shadow-2xl rounded-2xl p-6">
   <h1 class="text-3xl font-bold text-center text-blue-600 mb-4">🤖 Auto Google Form Bot</h1>
-  <p class="text-gray-600 text-center mb-6">Entry 1 akan diisi random dari database nama. Nama hanya bisa dipakai sekali. Pertanyaan lain pakai persentase jawaban.</p>
+  <p class="text-gray-600 text-center mb-6">Entry 1 (Nama) pakai database nama unik. Pertanyaan lain bisa Pilihan Ganda atau Essay/Teks.</p>
 
   <div class="space-y-4">
     <!-- Link Form -->
@@ -41,9 +41,14 @@
     <!-- Pertanyaan lain -->
     <div id="questionsContainer" class="space-y-2 mt-2">
       <div class="border p-3 rounded-lg bg-gray-100">
-        <label class="block text-gray-700 font-medium mb-1">Entry ID Pertanyaan 2 (Pilihan Ganda)</label>
+        <label class="block text-gray-700 font-medium mb-1">Entry ID Pertanyaan 2</label>
         <input id="entry_2" type="text" placeholder="entry.987654321" class="w-full p-2 border rounded mb-1">
-        <input id="percent_2" type="text" placeholder="Persentase jawaban (Ya=70,Tidak=30)" class="w-full p-2 border rounded">
+        <label class="block text-gray-700 font-medium mb-1">Tipe Pertanyaan</label>
+        <select id="type_2" class="w-full p-2 border rounded mb-1">
+          <option value="mc">Pilihan Ganda</option>
+          <option value="essay">Essay / Teks</option>
+        </select>
+        <input id="value_2" type="text" placeholder="MC: Ya=70,Tidak=30 | Essay: jawaban1,jawaban2" class="w-full p-2 border rounded">
       </div>
       <button onclick="addQuestion()" class="w-full bg-purple-600 text-white py-2 rounded mt-2 hover:bg-purple-700">➕ Tambah Pertanyaan</button>
     </div>
@@ -59,7 +64,7 @@
 </div>
 
 <script>
-let questionCount = 2; // entry 1 = Nama, entry 2 default pertanyaan lain
+let questionCount = 2;
 let randomAnswers = {};
 
 function addQuestion() {
@@ -70,7 +75,12 @@ function addQuestion() {
   div.innerHTML = `
     <label class="block text-gray-700 font-medium mb-1">Entry ID Pertanyaan ${questionCount}</label>
     <input id="entry_${questionCount}" type="text" placeholder="entry.xxxxx" class="w-full p-2 border rounded mb-1">
-    <input id="percent_${questionCount}" type="text" placeholder="Persentase jawaban" class="w-full p-2 border rounded">
+    <label class="block text-gray-700 font-medium mb-1">Tipe Pertanyaan</label>
+    <select id="type_${questionCount}" class="w-full p-2 border rounded mb-1">
+      <option value="mc">Pilihan Ganda</option>
+      <option value="essay">Essay / Teks</option>
+    </select>
+    <input id="value_${questionCount}" type="text" placeholder="MC: Ya=70,Tidak=30 | Essay: jawaban1,jawaban2" class="w-full p-2 border rounded">
   `;
   container.insertBefore(div, container.querySelector("button"));
 }
@@ -94,16 +104,16 @@ async function startBot() {
 
   const formResponseURL = formLink.replace("/viewform","/formResponse");
 
-  // Entry 1 = Nama (nama hanya sekali)
+  // Entry 1 = Nama unik
   const entryIdNama = document.getElementById("entry_1").value.trim();
   if(!entryIdNama){
     logBox.innerHTML += "<p class='text-red-500'>❌ Entry ID Nama kosong!</p>";
     return;
   }
 
-  let availableNames = [...namaDB]; // salin database
+  let availableNames = [...namaDB];
   if(target > availableNames.length){
-    logBox.innerHTML += "<p class='text-red-500'>❌ Jumlah target responden lebih besar dari jumlah nama di database!</p>";
+    logBox.innerHTML += "<p class='text-red-500'>❌ Jumlah target lebih besar dari database nama!</p>";
     return;
   }
 
@@ -111,34 +121,51 @@ async function startBot() {
   for(let j=0;j<target;j++){
     const idx = Math.floor(Math.random()*availableNames.length);
     arrNama.push(availableNames[idx]);
-    availableNames.splice(idx,1); // hapus nama yang sudah dipakai
+    availableNames.splice(idx,1);
   }
   randomAnswers[entryIdNama] = arrNama;
 
   // Pertanyaan lain
   for(let i=2;i<=questionCount;i++){
     const entryId = document.getElementById(`entry_${i}`).value.trim();
-    const percentInput = document.getElementById(`percent_${i}`).value.trim();
-    if(!entryId || !percentInput){
-      logBox.innerHTML += `<p class='text-red-500'>❌ Entry ID atau persentase pertanyaan ${i} kosong!</p>`;
+    const type = document.getElementById(`type_${i}`).value;
+    const value = document.getElementById(`value_${i}`).value.trim();
+
+    if(!entryId || !value){
+      logBox.innerHTML += `<p class='text-red-500'>❌ Entry ID atau nilai pertanyaan ${i} kosong!</p>`;
       return;
     }
-    const map = {};
-    percentInput.split(',').forEach(pair=>{
-      const [val,pct]=pair.split('=');
-      if(val && pct) map[val.trim()] = parseInt(pct.trim());
-    });
 
     let arr=[];
-    Object.keys(map).forEach(val=>{
-      const count = Math.round((map[val]/100)*target);
-      for(let j=0;j<count;j++) arr.push(val);
-    });
-    while(arr.length<target) arr.push(Object.keys(map)[0]);
-    for(let j=arr.length-1;j>0;j--){
-      const k=Math.floor(Math.random()*(j+1));
-      [arr[j],arr[k]]=[arr[k],arr[j]];
+    if(type === "mc"){
+      const map = {};
+      value.split(',').forEach(pair=>{
+        const [val,pct] = pair.split('=');
+        if(val && pct) map[val.trim()] = parseInt(pct.trim());
+      });
+      Object.keys(map).forEach(val=>{
+        const count = Math.round((map[val]/100)*target);
+        for(let j=0;j<count;j++) arr.push(val);
+      });
+      while(arr.length<target) arr.push(Object.keys(map)[0]);
+      // shuffle
+      for(let j=arr.length-1;j>0;j--){
+        const k=Math.floor(Math.random()*(j+1));
+        [arr[j],arr[k]]=[arr[k],arr[j]];
+      }
+    } else if(type === "essay"){
+      const essayDB = value.split(',').map(s=>s.trim()).filter(s=>s);
+      if(essayDB.length===0){
+        logBox.innerHTML += `<p
+        logBox.innerHTML += `<p class='text-red-500'>❌ Database essay pertanyaan ${i} kosong!</p>`;
+        return;
+      }
+      // Pilih random jawaban essay untuk tiap respon
+      for(let j=0;j<target;j++){
+        arr.push(essayDB[Math.floor(Math.random()*essayDB.length)]);
+      }
     }
+
     randomAnswers[entryId] = arr;
   }
 
@@ -148,12 +175,14 @@ async function startBot() {
     Object.keys(randomAnswers).forEach(entry=>{
       formData.append(entry, randomAnswers[entry][i]);
     });
+
     try{
       await fetch(formResponseURL,{method:"POST",body:formData,mode:"no-cors"});
       logBox.innerHTML += `<p class='text-green-600'>✅ Respon ke-${i+1} terkirim! (${JSON.stringify(Object.keys(randomAnswers).map(e=>randomAnswers[e][i]))})</p>`;
     }catch(err){
       logBox.innerHTML += `<p class='text-red-500'>❌ Gagal kirim respon ke-${i+1}</p>`;
     }
+
     logBox.scrollTop = logBox.scrollHeight;
     await new Promise(r=>setTimeout(r,delay));
   }
