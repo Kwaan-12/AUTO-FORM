@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Auto Google Form Bot - Persentase Jawaban</title>
+<title>Auto Google Form Bot - Entry 1 Random Nama</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
 <div class="max-w-xl w-full bg-white shadow-2xl rounded-2xl p-6">
   <h1 class="text-3xl font-bold text-center text-blue-600 mb-4">🤖 Auto Google Form Bot</h1>
-  <p class="text-gray-600 text-center mb-6">Masukkan entry ID & persentase jawaban, bot submit otomatis sesuai target.</p>
+  <p class="text-gray-600 text-center mb-6">Entry 1 akan diisi random dari database nama yang kamu masukkan. Pertanyaan lain pakai persentase jawaban.</p>
 
   <div class="space-y-4">
     <!-- Link Form -->
@@ -30,12 +30,20 @@
       </div>
     </div>
 
-    <!-- Pertanyaan -->
-    <div id="questionsContainer" class="space-y-2">
+    <!-- Entry 1 -->
+    <div class="border p-3 rounded-lg bg-gray-100">
+      <label class="block text-gray-700 font-medium mb-1">Entry ID Pertanyaan 1 (Nama)</label>
+      <input id="entry_1" type="text" placeholder="entry.123456789" class="w-full p-2 border rounded mb-2">
+      <label class="block text-gray-700 font-medium mb-1">Database Nama (pisahkan koma)</label>
+      <input id="namaDB" type="text" placeholder="Dzakwan,Gitaa,dst" class="w-full p-2 border rounded">
+    </div>
+
+    <!-- Pertanyaan lain -->
+    <div id="questionsContainer" class="space-y-2 mt-2">
       <div class="border p-3 rounded-lg bg-gray-100">
-        <label class="block text-gray-700 font-medium mb-1">Entry ID Pertanyaan 1</label>
-        <input id="entry_1" type="text" placeholder="entry.366340186" class="w-full p-2 border rounded mb-1">
-        <input id="percent_1" type="text" placeholder="Persentase jawaban (Ya=70,Tidak=30)" class="w-full p-2 border rounded">
+        <label class="block text-gray-700 font-medium mb-1">Entry ID Pertanyaan 2 (Pilihan Ganda)</label>
+        <input id="entry_2" type="text" placeholder="entry.987654321" class="w-full p-2 border rounded mb-1">
+        <input id="percent_2" type="text" placeholder="Persentase jawaban (Ya=70,Tidak=30)" class="w-full p-2 border rounded">
       </div>
       <button onclick="addQuestion()" class="w-full bg-purple-600 text-white py-2 rounded mt-2 hover:bg-purple-700">➕ Tambah Pertanyaan</button>
     </div>
@@ -51,7 +59,7 @@
 </div>
 
 <script>
-let questionCount = 1;
+let questionCount = 2; // entry 1 = Nama, entry 2 = pertanyaan lain default
 let randomAnswers = {};
 
 function addQuestion() {
@@ -62,7 +70,7 @@ function addQuestion() {
   div.innerHTML = `
     <label class="block text-gray-700 font-medium mb-1">Entry ID Pertanyaan ${questionCount}</label>
     <input id="entry_${questionCount}" type="text" placeholder="entry.xxxxx" class="w-full p-2 border rounded mb-1">
-    <input id="percent_${questionCount}" type="text" placeholder="Persentase jawaban (Ya=70,Tidak=30)" class="w-full p-2 border rounded">
+    <input id="percent_${questionCount}" type="text" placeholder="Persentase jawaban" class="w-full p-2 border rounded">
   `;
   container.insertBefore(div, container.querySelector("button"));
 }
@@ -72,24 +80,40 @@ async function startBot() {
   const delay = parseInt(document.getElementById("delay").value) || 500;
   const formLink = document.getElementById("formLink").value.trim();
   const logBox = document.getElementById("log");
+  const namaDB = document.getElementById("namaDB").value.split(',').map(s=>s.trim()).filter(s=>s);
   logBox.innerHTML = "<p class='text-blue-600 font-semibold'>🚀 Mulai submit...</p>";
 
   if (!formLink.includes("/viewform")) {
     logBox.innerHTML += "<p class='text-red-500'>❌ Link harus /viewform!</p>";
     return;
   }
+  if(namaDB.length===0){
+    logBox.innerHTML += "<p class='text-red-500'>❌ Database nama kosong!</p>";
+    return;
+  }
 
   const formResponseURL = formLink.replace("/viewform","/formResponse");
 
-  // Generate jawaban random sesuai persentase tiap pertanyaan
-  for (let i = 1; i <= questionCount; i++) {
+  // Entry 1 = Nama
+  const entryIdNama = document.getElementById("entry_1").value.trim();
+  if(!entryIdNama){
+    logBox.innerHTML += "<p class='text-red-500'>❌ Entry ID Nama kosong!</p>";
+    return;
+  }
+  let arrNama = [];
+  for(let j=0;j<target;j++){
+    arrNama.push(namaDB[Math.floor(Math.random()*namaDB.length)]);
+  }
+  randomAnswers[entryIdNama] = arrNama;
+
+  // Pertanyaan lain
+  for(let i=2;i<=questionCount;i++){
     const entryId = document.getElementById(`entry_${i}`).value.trim();
     const percentInput = document.getElementById(`percent_${i}`).value.trim();
-    if (!entryId || !percentInput) {
+    if(!entryId || !percentInput){
       logBox.innerHTML += `<p class='text-red-500'>❌ Entry ID atau persentase pertanyaan ${i} kosong!</p>`;
       return;
     }
-
     const map = {};
     percentInput.split(',').forEach(pair=>{
       const [val,pct]=pair.split('=');
