@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Auto Google Form Bot - Entry 1 Random Nama</title>
+<title>Auto Google Form Bot - Nama Unik</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
 <div class="max-w-xl w-full bg-white shadow-2xl rounded-2xl p-6">
   <h1 class="text-3xl font-bold text-center text-blue-600 mb-4">🤖 Auto Google Form Bot</h1>
-  <p class="text-gray-600 text-center mb-6">Entry 1 akan diisi random dari database nama yang kamu masukkan. Pertanyaan lain pakai persentase jawaban.</p>
+  <p class="text-gray-600 text-center mb-6">Entry 1 akan diisi random dari database nama. Nama hanya bisa dipakai sekali. Pertanyaan lain pakai persentase jawaban.</p>
 
   <div class="space-y-4">
     <!-- Link Form -->
@@ -35,7 +35,7 @@
       <label class="block text-gray-700 font-medium mb-1">Entry ID Pertanyaan 1 (Nama)</label>
       <input id="entry_1" type="text" placeholder="entry.123456789" class="w-full p-2 border rounded mb-2">
       <label class="block text-gray-700 font-medium mb-1">Database Nama (pisahkan koma)</label>
-      <input id="namaDB" type="text" placeholder="Dzakwan,Gitaa,dst" class="w-full p-2 border rounded">
+      <input id="namaDB" type="text" placeholder="Dzakwan,Gita,Rian,Sari,Andi" class="w-full p-2 border rounded">
     </div>
 
     <!-- Pertanyaan lain -->
@@ -59,7 +59,7 @@
 </div>
 
 <script>
-let questionCount = 2; // entry 1 = Nama, entry 2 = pertanyaan lain default
+let questionCount = 2; // entry 1 = Nama, entry 2 default pertanyaan lain
 let randomAnswers = {};
 
 function addQuestion() {
@@ -94,15 +94,24 @@ async function startBot() {
 
   const formResponseURL = formLink.replace("/viewform","/formResponse");
 
-  // Entry 1 = Nama
+  // Entry 1 = Nama (nama hanya sekali)
   const entryIdNama = document.getElementById("entry_1").value.trim();
   if(!entryIdNama){
     logBox.innerHTML += "<p class='text-red-500'>❌ Entry ID Nama kosong!</p>";
     return;
   }
+
+  let availableNames = [...namaDB]; // salin database
+  if(target > availableNames.length){
+    logBox.innerHTML += "<p class='text-red-500'>❌ Jumlah target responden lebih besar dari jumlah nama di database!</p>";
+    return;
+  }
+
   let arrNama = [];
   for(let j=0;j<target;j++){
-    arrNama.push(namaDB[Math.floor(Math.random()*namaDB.length)]);
+    const idx = Math.floor(Math.random()*availableNames.length);
+    arrNama.push(availableNames[idx]);
+    availableNames.splice(idx,1); // hapus nama yang sudah dipakai
   }
   randomAnswers[entryIdNama] = arrNama;
 
