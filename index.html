@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bot Auto Google Form</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+
+  <div class="max-w-lg w-full bg-white shadow-xl rounded-2xl p-6">
+    <h1 class="text-2xl font-bold text-center text-blue-600 mb-4">🤖 Bot Pengisi Google Form</h1>
+    <p class="text-gray-600 text-center mb-6">Masukkan link form, bot akan deteksi field dan kirim jawaban otomatis.</p>
+
+    <!-- FORM INPUT -->
+    <div class="space-y-4">
+      <div>
+        <label class="block text-gray-700 font-medium mb-1">Link Google Form</label>
+        <input id="formLink" type="text" placeholder="https://docs.google.com/forms/d/e/xxxx/viewform"
+          class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400">
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-gray-700 font-medium mb-1">Target Responden</label>
+          <input id="target" type="number" placeholder="Misal: 50"
+            class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400">
+        </div>
+
+        <div>
+          <label class="block text-gray-700 font-medium mb-1">Delay (ms)</label>
+          <input id="delay" type="number" placeholder="500"
+            class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400">
+        </div>
+      </div>
+
+      <div>
+        <button onclick="detectFields()"
+          class="w-full bg-purple-600 text-white font-bold py-3 rounded-xl shadow-md hover:bg-purple-700 transition">
+          🔍 Deteksi Field Form
+        </button>
+      </div>
+
+      <div id="fieldsContainer" class="space-y-2"></div>
+
+      <button onclick="startBot()"
+        class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-md hover:bg-blue-700 transition">
+        🚀 Jalankan Bot
+      </button>
+    </div>
+
+    <!-- LOG OUTPUT -->
+    <div class="mt-6 bg-gray-100 rounded-lg p-3 h-56 overflow-y-auto text-sm" id="log">
+      <p class="text-gray-500">Log akan muncul di sini...</p>
+    </div>
+  </div>
+
+  <script>
+    let detectedFields = [];
+    let randomAnswers = {};
+    let formResponseURL = "";
+
+    async function detectFields() {
+      const link = document.getElementById("formLink").value.trim();
+      const logBox = document.getElementById("log");
+      const container = document.getElementById("fieldsContainer");
+      container.innerHTML = "";
+      detectedFields = [];
+      randomAnswers = {};
+
+      if (!link.includes("/viewform")) {
+        logBox.innerHTML += "<p class='text-red-500'>❌ Link harus /viewform!</p>";
+        return;
+      }
+
+      formResponseURL = link.replace("/viewform", "/formResponse");
+      logBox.innerHTML = "<p class='text-blue-600'>🔄 Mendeteksi field dari form...</p>";
+
+      try {
+        const res = await fetch(link);
+        const html = await res.text();
+
+        const entryRegex = /name="(entry\.\d+)"/g;
+        let match;
+        while ((match = entryRegex.exec(html)) !== null) {
+          if (!detectedFields.includes(match[1])) detectedFields.push(match[1]);
+        }
+
+        if (detectedFields.length === 0) {
+          logBox.innerHTML += "<p class='text-red-500'>❌ Tidak ada field ditemukan.</p>";
+          return;
+        }
+
+        logBox.innerHTML += `<p class='text-green-600'>✅ Ditemukan ${detectedFields.length} field!</p>`;
+
+        // Tampilkan input jawaban untuk setiap field
+        detectedFields.forEach((id, idx) => {
+          const div = document.createElement("div");
+          div.innerHTML = `
+            <label class="block text-gray-700 font-medium mb-1">Jawaban untuk Field ${idx + 1} (${id})</label>
+            <input id="field_${id}" type="text" placeholder="Isi jawaban default atau kosong"
+              class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 mb-1">
+            <input id="percent_${id}" type="text" placeholder="Persentase jawaban (opsional, format A=70,B=30)"
+              class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400">
+          `;
+          container.appendChild(div);
+        });
+
+      } catch (err) {
+        logBox.innerHTML += "<p class='text-red-500'>❌ Gagal mendeteksi field. Pastikan form public.</p>";
+      }
+    }
+
+    async function startBot() {
+      const link = document.getElementById("formLink").value.trim();
+      const target = parseInt(document.getElementById("target").value) || 1;
+      const delay = parseInt(document.getElementById("delay").value) || 500;
+      const logBox = document.getElementById("log");
+
+      if (detectedFields.length === 0) {
+        logBox.innerHTML += "<p class='text-red-500'>⚠️ Harap deteksi field dulu!</p>";
+        return;
+      }
+
+      logBox.innerHTML += "<p class='text-blue-600 font-semibold'>🚀 Mulai submit...</p>";
+
+      // generate randomAnswers sesuai persentase
+      detectedFields.forEach(id => {
+        const percentInput = document.getElementById("percent_" + id).value.trim();
+        if (percentInput) {
+          const map = {};
+          percentInput.split(',').forEach(pair => {
+            const [val, pct] = pair.split('=');
+            if(val && pct) map[val.trim()] = parseInt(pct.trim());
+          });
+
+          let arr = [];
+          Object.keys(map).forEach(val => {
+            const count = Math.round((map[val]/100)*target);
+            for (let i=0;i<count;i++) arr.push(val);
+          });
+
+          while(arr.length < target) arr.push(Object.keys(map)[0]); // jika kurang
+          // acak array
+          for (let i=arr.length-1; i>0; i--){
+            const j = Math.floor(Math.random()*(i+1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+          }
+          randomAnswers[id] = arr;
+        } else {
+          const defaultVal = document.getElementById("field_" + id).value || "Jawaban";
+          randomAnswers[id] = Array(target).fill(defaultVal);
+        }
+      });
+
+      for (let i=0; i<target; i++) {
+        const formData = new URLSearchParams();
+        detectedFields.forEach(id => {
+          formData.append(id, randomAnswers[id][i]);
+        });
+
+        try {
+          await fetch(formResponseURL, { method: "POST", body: formData, mode: "no-cors" });
+          logBox.innerHTML += `<p class="text-green-600">✅ Respon ke-${i+1} terkirim!</p>`;
+        } catch (err) {
+          logBox.innerHTML += `<p class="text-red-500">❌ Gagal kirim respon ke-${i+1}</p>`;
+        }
+
+        logBox.scrollTop = logBox.scrollHeight;
+        await new Promise(r=>setTimeout(r, delay));
+      }
+
+      logBox.innerHTML += "<p class='text-blue-600 font-semibold'>🎉 Semua respon selesai!</p>";
+    }
+  </script>
+
+</body>
+</html>
