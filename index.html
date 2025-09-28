@@ -50,8 +50,8 @@
         </select>
         <input id="value_2" type="text" placeholder="MC: Ya=70,Tidak=30 | Essay: jawaban1,jawaban2" class="w-full p-2 border rounded">
       </div>
-      <button onclick="addQuestion()" class="w-full bg-purple-600 text-white py-2 rounded mt-2 hover:bg-purple-700">➕ Tambah Pertanyaan</button>
     </div>
+    <button onclick="addQuestion()" class="w-full bg-purple-600 text-white py-2 rounded mt-2 hover:bg-purple-700">➕ Tambah Pertanyaan</button>
 
     <!-- Tombol Jalankan -->
     <button onclick="startBot()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-md hover:bg-blue-700 transition">🚀 Jalankan Bot</button>
@@ -71,7 +71,7 @@ function addQuestion() {
   questionCount++;
   const container = document.getElementById("questionsContainer");
   const div = document.createElement("div");
-  div.className = "border p-3 rounded-lg bg-gray-100";
+  div.className = "border p-3 rounded-lg bg-gray-100 mt-2";
   div.innerHTML = `
     <label class="block text-gray-700 font-medium mb-1">Entry ID Pertanyaan ${questionCount}</label>
     <input id="entry_${questionCount}" type="text" placeholder="entry.xxxxx" class="w-full p-2 border rounded mb-1">
@@ -82,7 +82,7 @@ function addQuestion() {
     </select>
     <input id="value_${questionCount}" type="text" placeholder="MC: Ya=70,Tidak=30 | Essay: jawaban1,jawaban2" class="w-full p-2 border rounded">
   `;
-  container.insertBefore(div, container.querySelector("button"));
+  container.appendChild(div);
 }
 
 async function startBot() {
@@ -148,7 +148,6 @@ async function startBot() {
         for(let j=0;j<count;j++) arr.push(val);
       });
       while(arr.length<target) arr.push(Object.keys(map)[0]);
-      // shuffle
       for(let j=arr.length-1;j>0;j--){
         const k=Math.floor(Math.random()*(j+1));
         [arr[j],arr[k]]=[arr[k],arr[j]];
@@ -156,16 +155,13 @@ async function startBot() {
     } else if(type === "essay"){
       const essayDB = value.split(',').map(s=>s.trim()).filter(s=>s);
       if(essayDB.length===0){
-        logBox.innerHTML += `<p
         logBox.innerHTML += `<p class='text-red-500'>❌ Database essay pertanyaan ${i} kosong!</p>`;
         return;
       }
-      // Pilih random jawaban essay untuk tiap respon
       for(let j=0;j<target;j++){
         arr.push(essayDB[Math.floor(Math.random()*essayDB.length)]);
       }
     }
-
     randomAnswers[entryId] = arr;
   }
 
