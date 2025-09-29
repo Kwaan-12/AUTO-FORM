@@ -35,10 +35,20 @@
             @apply rounded-lg font-bold py-3 px-6 text-center shadow-md;
         }
         .btn-run {
+            /* Diubah menjadi Hijau */
+            @apply bg-green-600 text-white hover:bg-green-700 hover:shadow-lg;
+        }
+        .btn-pause {
+            /* Default: Kuning/Jeda */
+            @apply bg-yellow-500 text-white hover:bg-yellow-600 hover:shadow-lg;
+        }
+        .btn-success {
+            /* Untuk tombol Lanjutkan */
             @apply bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg;
         }
         .btn-stop {
-            @apply bg-red-500 text-white hover:bg-red-600 hover:shadow-lg;
+            /* Tetap Merah */
+            @apply bg-red-600 text-white hover:bg-red-700 hover:shadow-lg;
         }
         .btn-add {
             @apply bg-indigo-500 text-white hover:bg-indigo-600 hover:shadow-lg;
@@ -77,6 +87,7 @@
                     <div class="input-group">
                         <label for="targetCount" class="block mb-1 font-semibold text-gray-700">Target Responden (Jumlah Submit):</label>
                         <input type="number" id="targetCount" class="input-style" value="10" min="1" required>
+                        <p class="text-xs text-gray-500 mt-1">Bot akan mengirim sebanyak Target, dibatasi oleh jumlah nama unik.</p>
                     </div>
                     <div class="input-group lg:col-span-2">
                         <label for="delayMs" class="block mb-1 font-semibold text-gray-700">Jeda Antar Submit (ms):</label>
@@ -96,7 +107,7 @@
                     <div class="input-group">
                         <label for="nameDatabase" class="block mb-1 text-gray-700">Database Nama (Pisahkan dengan koma):</label>
                         <textarea id="nameDatabase" class="input-style" rows="3" placeholder="Dzakwan, Gita, Rian, Andi, Budi" required></textarea>
-                        <p class="text-xs text-gray-500 mt-1">Nama digunakan **satu kali** per submit. Jumlah submit tidak akan melebihi jumlah nama.</p>
+                        <p class="text-xs text-gray-500 mt-1">Setiap nama akan digunakan **SATU KALI SAJA**.</p>
                     </div>
                 </div>
             </div>
@@ -118,18 +129,29 @@
                 Tambah Pertanyaan Baru
             </button>
 
-            <!-- Tombol Jalankan & Hentikan Bot -->
-            <div class="grid grid-cols-2 gap-4 mt-8">
+            <!-- Tombol Jalankan & Jeda/Lanjutkan & Hentikan Bot -->
+            <div class="grid grid-cols-3 gap-4 mt-8">
+                <!-- 1. JALANKAN BOT -->
                 <button id="runBotButton" class="w-full btn-base btn-run text-lg flex items-center justify-center" onclick="runBot()">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     Jalankan Bot
                 </button>
-                <button id="stopBotButton" class="w-full btn-base btn-stop text-lg flex items-center justify-center" onclick="stopBot()" disabled>
+                <!-- 2. JEDA / LANJUTKAN BOT -->
+                <button id="pauseResumeButton" class="w-full btn-base btn-pause text-lg flex items-center justify-center" onclick="handlePauseResume()" disabled>
+                    <!-- Ikon Jeda -->
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Jeda Bot
+                </button>
+                <!-- 3. HENTIKAN BOT -->
+                <button id="stopBotButton" class="w-full btn-base btn-stop text-lg flex items-center justify-center" onclick="stopBot()" disabled>
+                    <!-- Ikon Hentikan/Silang (sesuai gambar) -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                         <path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     Hentikan Bot
                 </button>
@@ -160,17 +182,22 @@
     <script>
         const logContainer = document.getElementById('logContainer');
         const runBotButton = document.getElementById('runBotButton');
-        const stopBotButton = document.getElementById('stopBotButton');
-        const addQuestionButton = document.getElementById('addQuestionButton'); // Ambil tombol Tambah Pertanyaan
+        const pauseResumeButton = document.getElementById('pauseResumeButton'); 
+        const stopBotButton = document.getElementById('stopBotButton'); // NEW ELEMENT
+        const addQuestionButton = document.getElementById('addQuestionButton'); 
         const questionListContainer = document.getElementById('questionList');
         let questionCounter = 0;
-        let isRunning = false;
+        
+        let isRunning = false;     // True only when the submission loop is actively running
+        let isBotActive = false;   // True if the bot has started (can be running or paused)
+        let isStopping = false;    // NEW: Flag to signal complete abort/stop
+        let currentSubmitIndex = 0; // Tracks the index (0-based) to resume from
         
         // Daftar semua input yang perlu dinonaktifkan
         const inputsToToggle = [
             document.getElementById('formUrl'),
             document.getElementById('pageHistory'),
-            document.getElementById('targetCount'),
+            document.getElementById('targetCount'), 
             document.getElementById('delayMs'),
             document.getElementById('entryNameId'),
             document.getElementById('nameDatabase')
@@ -202,20 +229,62 @@
             });
         }
 
-
         /**
-         * Fungsi untuk menghentikan bot
+         * Mereset bot ke status awal.
+         */
+        function resetBot() {
+            isRunning = false;
+            isBotActive = false;
+            isStopping = false;
+            currentSubmitIndex = 0;
+            toggleInputState(false);
+            runBotButton.disabled = false;
+            runBotButton.textContent = 'Jalankan Bot';
+            
+            // Reset state tombol Jeda/Lanjutkan
+            pauseResumeButton.disabled = true;
+            pauseResumeButton.textContent = 'Jeda Bot';
+            pauseResumeButton.classList.remove('btn-success');
+            pauseResumeButton.classList.add('btn-pause');
+            
+            stopBotButton.disabled = true;
+        }
+        
+        /**
+         * Fungsi untuk menghentikan total proses bot (abort).
          */
         function stopBot() {
+            if (isBotActive) {
+                log('🛑 Perintah Hentikan Diterima. Proses dibatalkan.', 'error');
+                isStopping = true; // Set flag to force full reset
+                isRunning = false; // Break loop if running
+            } else {
+                log('Bot tidak sedang berjalan.', 'warning');
+            }
+        }
+
+        /**
+         * Fungsi untuk menjeda atau melanjutkan bot.
+         */
+        function handlePauseResume() {
             if (isRunning) {
-                isRunning = false;
-                log('🛑 Bot dihentikan oleh pengguna.', 'system');
-                
-                // Aktifkan kembali semua input dan tombol
-                toggleInputState(false);
-                runBotButton.disabled = false;
-                runBotButton.textContent = 'Jalankan Bot';
-                stopBotButton.disabled = true;
+                // PAUSE action: The loop will exit gracefully.
+                isRunning = false; 
+                // UI update untuk Jeda
+                pauseResumeButton.textContent = 'Lanjutkan Bot';
+                pauseResumeButton.classList.remove('btn-pause');
+                pauseResumeButton.classList.add('btn-success'); // Warna Hijau saat siap dilanjutkan
+            } else if (isBotActive) {
+                // RESUME action (if the bot was paused)
+                log(`▶️ Melanjutkan Bot dari responden #${currentSubmitIndex + 1}...`, 'system');
+                // UI update untuk Lanjutkan
+                pauseResumeButton.textContent = 'Jeda Bot';
+                pauseResumeButton.classList.remove('btn-success');
+                pauseResumeButton.classList.add('btn-pause');
+                runBot(true); // Call runBot to resume
+            } else {
+                // Failsafe reset if the state gets mixed up
+                resetBot();
             }
         }
 
@@ -323,8 +392,8 @@
          * Menambahkan blok pertanyaan dinamis ke UI.
          */
         function addQuestion() {
-            if (isRunning) {
-                 log('Tidak dapat menambahkan pertanyaan saat bot berjalan.', 'warning');
+            if (isRunning || isBotActive) {
+                 log('Tidak dapat menambahkan pertanyaan saat bot berjalan atau dijeda.', 'warning');
                  return;
             }
             
@@ -368,8 +437,8 @@
          * Menghapus blok pertanyaan dari UI.
          */
         function removeQuestion(id) {
-            if (isRunning) {
-                 log('Tidak dapat menghapus pertanyaan saat bot berjalan.', 'warning');
+            if (isRunning || isBotActive) {
+                 log('Tidak dapat menghapus pertanyaan saat bot berjalan atau dijeda.', 'warning');
                  return;
             }
             const block = document.querySelector(`.question-block[data-question-id="${id}"]`);
@@ -380,103 +449,111 @@
         }
 
         /**
-         * Fungsi utama untuk menjalankan bot.
+         * Fungsi utama untuk menjalankan/melanjutkan bot.
          */
-        async function runBot() {
-            if (isRunning) {
-                log('Bot sedang berjalan, tunggu hingga selesai atau hentikan.', 'warning');
-                return;
-            }
+        async function runBot(isResume = false) {
+            if (isRunning) return; // Already running
 
-            // 1. Ambil input dasar
-            const formUrl = document.getElementById('formUrl').value.trim();
-            const pageHistory = document.getElementById('pageHistory').value.trim(); // Ambil Page History
-            const targetCount = parseInt(document.getElementById('targetCount').value);
+            // --- 1. Ambil Input Dasar ---
             const delayMs = parseInt(document.getElementById('delayMs').value);
+            const formUrl = document.getElementById('formUrl').value.trim();
+            const pageHistory = document.getElementById('pageHistory').value.trim();
+            const targetCount = parseInt(document.getElementById('targetCount').value);
             const entryNameId = document.getElementById('entryNameId').value.trim();
-            // Perhatikan: Database Nama sekarang kosong secara default, jadi kita harus mengandalkan input user
             const nameDatabase = document.getElementById('nameDatabase').value.split(',').map(s => s.trim()).filter(s => s.length > 0);
-            const questions = getQuestionConfig();
-
-            // 2. Validasi Input
-            if (!formUrl || !targetCount || !delayMs || !entryNameId || nameDatabase.length === 0) {
-                showModal("Input Dasar Tidak Lengkap", "Harap isi Link Form, Entry ID Nama, dan Database Nama.");
-                return;
-            }
-            if (!formUrl.includes('/viewform')) {
-                showModal("Link Salah", "URL harus mengandung '/viewform'. Pastikan Anda memasukkan link formulir yang benar.");
-                return;
-            }
-            if (!pageHistory) {
-                 showModal("Page History Kosong", "Untuk form multi-halaman, 'Page History ID' sangat penting. Harap isi nilai ini (misal: 0,1) agar data bisa terkirim!");
-                 return;
-            }
-            // Peringatan jika pertanyaan dinamis kosong
-            if (questions.length === 0) {
-                log('Peringatan: Tidak ada Pertanyaan Dinamis ditemukan. Hanya Entry Nama yang akan dikirim.', 'warning');
-            }
-
-            // --- Logika Perubahan: Nama hanya dipakai sekali ---
-            const actualTargetCount = Math.min(targetCount, nameDatabase.length);
-            if (targetCount > nameDatabase.length) {
-                log(`Peringatan: Target responden (${targetCount}) lebih besar dari jumlah nama (${nameDatabase.length}). Bot hanya akan mengirim ${actualTargetCount} kali untuk memastikan setiap nama digunakan SEKALI SAJA.`, 'warning');
-            }
-            // ---------------------------------------------------
-
-            // 3. Persiapan Bot
-            isRunning = true;
-            toggleInputState(true); // NONAKTIFKAN SEMUA INPUT UTAMA
-            runBotButton.disabled = true;
-            stopBotButton.disabled = false;
-            runBotButton.textContent = '🤖 Bot Sedang Berjalan...';
-            logContainer.innerHTML = '';
-            log(`Mulai pengiriman ${actualTargetCount} kali dengan jeda ${delayMs}ms (Nama hanya dipakai sekali).`, 'system');
+            const questions = getQuestionConfig(); 
             
-            // Ubah URL 'viewform' menjadi 'formResponse'
             const submitUrl = formUrl.replace('/viewform', '/formResponse');
-            log(`URL Submit: ${submitUrl}`, 'info');
+            const actualTargetCount = Math.min(targetCount, nameDatabase.length);
 
-            // 4. Loop Pengiriman Data
-            for (let i = 0; i < actualTargetCount; i++) {
+            // --- 2. Validasi (Hanya dilakukan jika start baru) ---
+            if (!isResume) {
+                // Cek input wajib non-kosong/valid numerik
+                if (!formUrl || !entryNameId || nameDatabase.length === 0 || isNaN(delayMs) || delayMs < 100 || isNaN(targetCount) || targetCount < 1) {
+                    showModal("Input Dasar Tidak Lengkap", "Harap isi Link Form, Entry ID Nama, dan Database Nama. Pastikan Target Responden dan Jeda diisi dengan angka valid.");
+                    return;
+                }
+                if (!formUrl.includes('/viewform')) {
+                    showModal("Link Salah", "URL harus mengandung '/viewform'. Pastikan Anda memasukkan link formulir yang benar.");
+                    return;
+                }
+                if (!pageHistory) {
+                     showModal("Page History Kosong", "Untuk form multi-halaman, 'Page History ID' sangat penting. Harap isi nilai ini (misal: 0,1) agar data bisa terkirim!");
+                     return;
+                }
                 
-                // Cek status isRunning sebelum setiap iterasi
+                // **--- VALIDASI TARGET VS NAMA BARU ---**
+                if (targetCount > nameDatabase.length) {
+                    showModal(
+                        "⚠️ Target Melebihi Database Nama", 
+                        `Target Responden Anda (${targetCount}) melebihi jumlah nama unik yang tersedia (${nameDatabase.length}). Bot hanya akan mengirim **${actualTargetCount} kali** untuk memastikan setiap nama digunakan SATU KALI SAJA.`,
+                        true // Gunakan warna peringatan/error
+                    );
+                    // Tidak return, biarkan bot berjalan dengan target yang dikurangi
+                }
+                
+                isBotActive = true; // Mark bot as active (started)
+                currentSubmitIndex = 0; // Reset index for new run
+            }
+            
+            // --- 3. Persiapan Bot & UI Update ---
+            isRunning = true;
+            toggleInputState(true); // NONAKTIFKAN SEMUA INPUT
+            runBotButton.disabled = true;
+            runBotButton.textContent = '🤖 Bot Sedang Berjalan...';
+            pauseResumeButton.disabled = false;
+            pauseResumeButton.textContent = 'Jeda Bot';
+            pauseResumeButton.classList.remove('btn-success');
+            pauseResumeButton.classList.add('btn-pause');
+            stopBotButton.disabled = false; // AKTIFKAN TOMBOL HENTIKAN
+            
+            if (!isResume) {
+                logContainer.innerHTML = '';
+                log(`Mulai pengiriman ${actualTargetCount} kali dari awal (Responden #1).`, 'system');
+                log(`URL Submit: ${submitUrl}`, 'info');
+                // Peringatan ini dipindahkan ke modal, tetapi tetap di log untuk referensi
+                if (targetCount > nameDatabase.length) {
+                    log(`Target (${targetCount}) dikurangi menjadi ${actualTargetCount} kali (sesuai jumlah nama unik).`, 'warning');
+                }
+            }
+            
+            // --- 4. Loop Pengiriman Data ---
+            for (let i = currentSubmitIndex; i < actualTargetCount; i++) {
+                
                 if (!isRunning) {
-                    log(`✅ Pengiriman dihentikan setelah ${i} submit.`, 'system');
+                    // Bot has been paused by the user, exit loop cleanly
                     break;
                 }
 
                 const submitNumber = i + 1;
                 
                 // --- A. Generate Jawaban ---
-                const nameIndex = i; // Menggunakan index i langsung (tidak cycling)
-                const nameAnswer = nameDatabase[nameIndex];
+                const nameAnswer = nameDatabase[i]; // Ambil nama unik sesuai index i
                 
                 const formData = new URLSearchParams();
                 let logDetail = `Nama (${entryNameId}): **${nameAnswer}**`;
 
-                // Tambahkan Nama
                 formData.append(entryNameId, nameAnswer); 
-
-                // Tambahkan Page History (KUNCI untuk Multi-Halaman)
                 formData.append('pageHistory', pageHistory);
                 logDetail += `, PageHistory: **${pageHistory}**`;
                 
-                // Tambahkan Pertanyaan Dinamis
                 let hasError = false;
                 for (const q of questions) {
                     const answer = generateAnswer(q.type, q.data);
-
                     if (answer === null) {
-                        log(`Gagal menghasilkan jawaban untuk Entry ID ${q.entryId} (Data/Persentase tidak valid). Submit dibatalkan.`, 'error');
+                        log(`Gagal menghasilkan jawaban untuk Entry ID ${q.entryId} (Data/Persentase tidak valid). Pengiriman dibatalkan.`, 'error');
                         hasError = true;
-                        break;
+                        break; 
                     }
-                    
                     formData.append(q.entryId, answer);
                     logDetail += `, ${q.type} (${q.entryId}): **${answer}**`;
                 }
                 
-                if (hasError) continue;
+                if (hasError) {
+                    // If error in generating data, we stop the loop and allow editing
+                    isRunning = false;
+                    break; 
+                }
 
                 // --- B. Kirim data ---
                 log(`[${submitNumber}/${actualTargetCount}] Mengirim: ${logDetail}`, 'info');
@@ -485,38 +562,54 @@
                     const fetchOptions = {
                         method: 'POST',
                         body: formData,
-                        // Gunakan no-cors untuk mengabaikan batasan domain. 
                         mode: 'no-cors', 
                     };
-
-                    const response = await fetch(submitUrl, fetchOptions);
-
-                    // Dalam mode 'no-cors', response.ok akan selalu false. 
-                    // Kita asumsikan sukses jika fetch() tidak melempar error.
+                    await fetch(submitUrl, fetchOptions);
                     log(`[${submitNumber}/${actualTargetCount}] Pengiriman Selesai. (Asumsi sukses karena mode no-cors)`, 'success');
 
                 } catch (error) {
-                    log(`[${submitNumber}/${actualTargetCount}] Pengiriman GAGAL Total (Error Jaringan/CORS): ${error.message}`, 'error');
+                    log(`[${submitNumber}/${actualTargetCount}] Pengiriman GAGAL Total (Error Jaringan/CORS): ${error.message}. Bot dihentikan.`, 'error');
+                    isStopping = true; // Set stopping flag on fatal error
+                    isRunning = false;
+                    break; 
                 }
+                
+                // Update the index to the NEXT submit before the delay
+                currentSubmitIndex = i + 1;
 
                 // --- C. Jeda ---
-                if (i < actualTargetCount - 1) {
+                if (currentSubmitIndex < actualTargetCount && isRunning) {
                     await new Promise(resolve => setTimeout(resolve, delayMs));
                 }
-            }
+            } // End of loop
 
-            // 5. Selesai
+            // --- 5. Cleanup ---
             if (isRunning) {
-                log(`✅ Selesai! Bot telah menyelesaikan ${actualTargetCount} pengiriman.`, 'system');
-                showModal("Proses Selesai", `Bot telah selesai mengirim ${actualTargetCount} respons. Harap cek respons formulir Anda.`, false);
+                // Natural finish (loop completed)
+                log(`✅ Selesai! Bot telah menyelesaikan ${actualTargetCount} pengiriman unik.`, 'system');
+                showModal("Proses Selesai", `Bot telah selesai mengirim ${actualTargetCount} respons unik. Harap cek respons formulir Anda.`, false);
+                
+                // Reset to initial state
+                resetBot();
+            } else if (isStopping) {
+                // Manual Stop (via stopBot()) or Fatal Error
+                log('🛑 Bot Dihentikan Total. Status direset.', 'error');
+                resetBot();
+            } 
+            else if (isBotActive && currentSubmitIndex < actualTargetCount) {
+                // Manual Pause (isRunning became false, but not stopping)
+                toggleInputState(false); // Enable editing
+                runBotButton.disabled = true; 
+                pauseResumeButton.disabled = false;
+                pauseResumeButton.textContent = 'Lanjutkan Bot';
+                pauseResumeButton.classList.remove('btn-pause');
+                pauseResumeButton.classList.add('btn-success'); // Warna Hijau saat siap dilanjutkan (Resume)
+                stopBotButton.disabled = false; // Keep stop button enabled during pause
+                log(`Bot dijeda oleh pengguna. Siap melanjutkan dari responden #${currentSubmitIndex + 1}.`, 'system');
+            } else {
+                // Other non-completion scenario
+                resetBot();
             }
-            
-            isRunning = false;
-            // AKTIFKAN KEMBALI SEMUA INPUT
-            toggleInputState(false);
-            runBotButton.disabled = false;
-            runBotButton.textContent = 'Jalankan Bot';
-            stopBotButton.disabled = true;
         }
 
         // Jalankan addQuestion saat halaman dimuat untuk pertanyaan default/contoh
